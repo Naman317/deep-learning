@@ -33,4 +33,66 @@ def audit_historical_predictions():
             if isinstance(hist.columns, pd.MultiIndex):
                 hist = hist.xs(t, level=1, axis=1)
             hist_cache[t] = hist
-    pass
+        except Exception:
+            pass
+
+    evaluated = []
+    for _, row in logs_df.iterrows():
+        ticker = row['ticker']
+        pred_time = row['timestamp']
+        pred_date = pd.to_datetime(pred_time.split(' ')[0])
+        curr_p = row['current_price']
+        pred_p = row['predicted_price']
+
+        if ticker not in hist_cache or hist_cache[ticker].empty:
+            continue
+
+        hist = hist_cache[ticker]
+        dates_after = hist.index[hist.index > pred_date]
+
+        if len(dates_after) > 0:
+            actual_date = dates_after[0].strftime('%Y-%m-%d')
+            actual_price = float(hist.loc[dates_after[0], 'Close'])
+            err = abs(actual_price - pred_p) / actual_price * 100
+            
+            dir_pred = "UP" if pred_p > curr_p else "DOWN"
+            dir_actual = "UP" if actual_price > curr_p else "DOWN"
+            hit = (dir_pred == dir_actual)
+
+            evaluated.append({
+                'timestamp': pred_time,
+                'ticker': ticker,
+                'curr_price': curr_p,
+                'pred_price': pred_p,
+                'actual_date': actual_date,
+                'actual_price': actual_price,
+                'error_pct': err,
+                'hit': hit
+            })
+
+    if not evaluated:
+        return {"status": "AWAITING_SETTLEMENT", "count": len(logs_df)}
+
+    df = pd.DataFrame(evaluated)
+    mape = df['error_pct'].mean()
+    hits = df['hit'].sum()
+    total = len(df)
+    precision = (hits / total) * 100
+
+    return {
+        "status": "SUCCESS",
+        "total_evaluated": total,
+        "mape": mape,
+        "accuracy": 100 - mape,
+        "precision": precision,
+        "hits": hits,
+        "records": df
+    }
+
+
+if __name__ == "__main__":
+    res = audit_historical_predictions()
+    if res.get('status') == 'SUCCESS':
+        print(f"Accuracy: {res['accuracy']:.2f}% | Precision: {res['precision']:.1f}% ({res['hits']}/{res['total_evaluated']})")
+    else:
+        print(res.get('message', 'No settled records.'))
