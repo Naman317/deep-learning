@@ -98,4 +98,12 @@ def run_pipeline(ticker="AAPL", horizon=7, model_type="LSTM", execute_trade=Fals
     print("=" * 70)
 
 
-    pass
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="AlphaTrade CLI Inference Engine")
+    parser.add_argument("--ticker", type=str, default="AAPL", help="Stock ticker symbol (e.g. AAPL, RELIANCE.NS)")
+    parser.add_argument("--horizon", type=int, default=7, help="Multi-day forecast horizon (1 to 30)")
+    parser.add_argument("--model", type=str, default="LSTM", choices=["LSTM", "RNN"], help="Neural architecture")
+    parser.add_argument("--trade", action="store_true", help="Enable paper trade order execution")
+    args = parser.parse_args()
+    
+    run_pipeline(ticker=args.ticker, horizon=args.horizon, model_type=args.model, execute_trade=args.trade)
